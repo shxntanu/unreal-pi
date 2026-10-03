@@ -18,6 +18,7 @@ cp permission-gate.ts ~/.pi/agent/extensions/
 
 | Extension | Description |
 |-----------|-------------|
+| `baseline-metrics.ts` | Opt-in stock-harness JSONL run/tool metrics; see [async experiment instructions](../../../../experiments/async-harness/README.md) |
 | `permission-gate.ts` | Prompts for confirmation before dangerous bash commands (rm -rf, sudo, etc.) |
 | `project-trust.ts` | Demonstrates the `project_trust` event for user/global and CLI extensions |
 | `protected-paths.ts` | Blocks writes to protected paths (.env, .git/, node_modules/) |
