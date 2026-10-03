@@ -708,7 +708,7 @@ export class AgentSession {
 		this._nestedToolCalls ??= new NestedToolCallRunner({
 			getTools: () => this._getCallableTools(),
 			isSequential: () => this.agent.toolExecution === "sequential",
-			runToolCall: (toolCall, parentId, signal, onUpdate) => {
+			runToolCall: (toolCall, parentId, signal, onUpdate, execute) => {
 				const assistantMessage = this._findLastAssistantMessage();
 				if (!assistantMessage) {
 					return Promise.resolve({
@@ -717,8 +717,11 @@ export class AgentSession {
 						isError: true,
 					});
 				}
+				const tools = this._getCallableTools();
 				return runToolCall(toolCall, {
-					tools: this._getCallableTools(),
+					tools: execute
+						? tools.map((tool) => (tool.name === toolCall.name ? { ...tool, execute } : tool))
+						: tools,
 					assistantMessage,
 					context: { messages: this.agent.state.messages, tools: this.agent.state.tools },
 					beforeToolCall: (context) => this._beforeToolCall(context, parentId),
@@ -3469,7 +3472,9 @@ export class AgentSession {
 					name,
 					{
 						definition,
-						sourceInfo: createSyntheticSourceInfo(`${BUILTIN_PATH_PREFIX}${name}`, { source: "builtin" }),
+						sourceInfo: this._baseToolsOverride
+							? createSyntheticSourceInfo(`<sdk:${name}>`, { source: "sdk" })
+							: createSyntheticSourceInfo(`${BUILTIN_PATH_PREFIX}${name}`, { source: "builtin" }),
 					},
 				]),
 		);
@@ -3503,9 +3508,9 @@ export class AgentSession {
 				.filter((definition) => this._isAllowedTool(definition.name))
 				.map((definition) => ({
 					definition,
-					sourceInfo: createSyntheticSourceInfo(`${BUILTIN_PATH_PREFIX}${definition.name}`, {
-						source: "builtin",
-					}),
+					sourceInfo: this._baseToolsOverride
+						? createSyntheticSourceInfo(`<sdk:${definition.name}>`, { source: "sdk" })
+						: createSyntheticSourceInfo(`${BUILTIN_PATH_PREFIX}${definition.name}`, { source: "builtin" }),
 				})),
 			runner,
 		);

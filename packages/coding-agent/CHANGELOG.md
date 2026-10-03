@@ -9,6 +9,8 @@
 - Added project overrides for user-level MCP servers: a `.pi/mcp.json` entry without `command` or `url` sets only `enabled`, `exposure`, and `toolExposure` of the user-level server, and `/mcp` can enable or disable a server for the current project ([#10277](https://github.com/earendil-works/pi/issues/10277))
 - Added Cloudflare's Clef and Clef Flash classifier models to `cloudflare-workers-ai`, usable from codemode scripts and extensions ([#10316](https://github.com/earendil-works/pi/pull/10316) by [@ndisidore](https://github.com/ndisidore), [#10322](https://github.com/earendil-works/pi/pull/10322) by [@RealAlexandreAI](https://github.com/RealAlexandreAI))
 - Added an opt-in `baseline-metrics.ts` extension example recording versioned JSONL run and tool metrics for the async harness experiment, including retries, nested tools, and aborted runs without changing model context.
+- Added trusted per-call nested tool executors that retain argument validation and permission/result hooks, enabling the async harness extension to submit authorized Bash jobs without replacing normal Bash.
+- Exported the existing `getBinDir` helper for extensions that preserve Pi-managed binary PATH handling.
 
 ### Changed
 
@@ -24,6 +26,7 @@
 - Fixed a trailing comma in `--models` adding an extra model to the model cycle ([#10334](https://github.com/earendil-works/pi/issues/10334))
 - Fixed a `codemode` script that prints in a loop crashing pi by running out of memory: a script fails once its output passes 16 Mi characters or 100000 items ([#10283](https://github.com/earendil-works/pi/issues/10283))
 - Fixed JPEG, GIF, and WebP images rendered by extensions through `Image` not appearing in Kitty, Ghostty, WezTerm, and Warp ([#10292](https://github.com/earendil-works/pi/issues/10292))
+- Fixed SDK base-tool overrides reporting built-in source provenance instead of SDK provenance.
 
 ## [1.0.0] - 2026-10-01
 

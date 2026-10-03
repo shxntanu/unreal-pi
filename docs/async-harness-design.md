@@ -2,7 +2,7 @@
 
 ## Scope and sequence
 
-Implement `pi-async-harness-experiment.md` one milestone at a time. The first step is architecture inspection and Milestone 0 (stock-Pi baseline instrumentation). Do not add unit tests. Use temporary smoke scenarios with the existing faux provider; do not require paid model calls. Do not commit or change branches automatically.
+Implement `pi-async-harness-experiment.md` one milestone at a time. Architecture inspection and Milestones 0–3 are implemented: baseline instrumentation, standalone operation runtime, shell execution, and four Pi tools. Automatic completion delivery remains Milestone 4. Do not add unit tests. Use temporary smoke scenarios; do not require paid model calls. Commit only when requested and never change branches automatically.
 
 The inspected checkout differs from the plan's assumed layout: Bash is in `packages/coding-agent/src/core/tools/bash.ts`, sessions in `src/core/session-manager.ts`, and package names use `@earendil-works/`. It also already contains `packages/durable` and `packages/telemetry`. Their existing exports are not evidence that detached shell operations are supported by the CLI. Evaluate them before introducing overlapping abstractions in later milestones.
 
@@ -75,15 +75,15 @@ Verified declarations: `packages/coding-agent/src/core/extensions/types.ts`. Doc
 
 Bash supports configurable operations, command prefixes, shell selection, spawn hooks, and session environment metadata. A new tool name does not automatically inherit a permission extension's `toolName === "bash"` policy. Before async daily use, explicitly reuse the existing safety path or migrate the policy to cover async commands. The standalone runner must not silently bypass configured sandbox/remote Bash backends.
 
-## Extension-only implementation path
+## Integration path
 
 1. Baseline: an explicit observation-only extension; no agent-loop changes or extra prompt tokens.
 2. Runtime: independent operation types/store/manager, process ownership, bounded output, cancellation, timeouts, terminal-state invariants, recovery.
-3. Integration: four public tools (`run_async`, status, output, cancel), short prompt guidance, session association.
+3. Integration: four public tools (`run_async`, status, output, cancel), short prompt guidance, session association, and permission-preserving nested Bash admission.
 4. Completion bridge: append compact custom messages through `sendMessage`, with persistent consumer bookkeeping and recoverable undelivered events. The public extension API returns void for sending: do not equate a send request with acknowledged durable delivery without inspecting the runner and session path.
 5. Operator commands: `/ops`, `/op`, `/op-cancel` through existing command/UI APIs.
 
-No core changes are required to begin these steps. Baseline instrumentation must work before runtime implementation begins.
+Baseline and the standalone runtime require no core changes. Milestone 3 needs a narrow coding-agent API addition: nested `executeTool` accepts a trusted per-call executor, invoked only after the existing tool's schema validation and permission hooks. Calling ordinary Bash would wait for the command; submitting directly from a differently named tool would miss Bash-specific permission handlers. No agent-loop scheduling changes are needed.
 
 ## When core modification might be necessary
 
@@ -100,3 +100,33 @@ Count conversational model responses (including error/aborted responses) from fi
 Provider-reported input, output, cache-read, and cache-write tokens are separate counters, not estimates. Conversational input follows Pi's `usage.input` convention; cache tokens are not silently added to it. Compaction, cache warming, and nested model requests are outside the conversational counters and must not be presented as total provider billing. This limitation must accompany benchmark comparisons.
 
 Records are versioned and contain run/session/model identity, timestamps, monotonic durations, errors, and completion status. No prompt, command arguments, or raw tool output is persisted. Optional input/output sizes are omitted to avoid serializing large payloads solely for telemetry. Completed tool rows stream to disk; memory retains only active calls. Instrumentation failures are reported and invalidate collection rather than fabricating missing values.
+
+## Milestone 1 implementation
+
+`packages/async-operations` exports JSON-only operation/result/event contracts, `SQLiteOperationStore`, and `LocalOperationManager`. It imports Node built-ins only. Existing `packages/durable` exports carry Pi model/harness dependencies, so reusing that task engine would violate this experiment's independent-runtime boundary.
+
+Node's built-in SQLite API works at the repository's minimum Node version without dependency/install friction. The store uses schema version 1, UUIDs, globally sequenced append-only events, indexed JSON snapshots, bounded queries, and atomic creation/transition transactions. The planned store abstraction gains `transition` to prevent a crash between snapshot update and event append, plus `acquireOwnership` to prevent recovery from failing another live manager's jobs.
+
+The manager claims a transaction-protected PID/token lease, resumes registered pending work, marks old running work `lost_process` without replay, and limits active runners (default 4). No unbounded in-memory pending queue is retained. Cancellation commits one terminal state after runner cleanup. Storage errors stop scheduling and surface to the host; they never produce an unpersisted completion notification.
+
+Payload and result limits are 256 KiB each; the full snapshot reserves 528 KiB for both plus lifecycle metadata. A temporary boundary smoke reproduced an admitted payload that could not store its terminal result under a combined 256 KiB limit; the separated bounds now allow that job to finish. Summary/error limits are 8 KiB; history queries default to 100 rows and cap at 10,000.
+
+The runner contract requires trusted hosts to register real runners that honor cancellation, own their I/O/resources, report output byte counts, and return paths/metadata. Milestone 2 supplies this contract's shell implementation.
+
+Temporary smoke scenarios exercised real file hashing/output, concurrency, pending/running cancellation, thrown and non-zero-exit failures, restart persistence, stale process ownership reclaim, no running replay, unknown schemas, atomic rollback on rejected event insertion, and 16 completion/cancellation races with one terminal event each. No unit tests or benchmark benefit claims were added.
+
+## Milestones 2–3 implementation
+
+`ShellOperationRunner` spawns real processes, streams separate stdout/stderr files, retains bounded byte tails, records versioned metadata, and captures exit codes and duration. Logs live under `<rootDir>/runs/<operation-id>/`. Defaults: 64 KiB tail per stream, 128 MiB combined log limit, and 250 ms graceful termination before process-tree escalation. Exceeding the disk bound stops the job with an explicit runtime error.
+
+POSIX jobs use detached process groups. Cancellation and timeout terminate the group, including descendants that ignore SIGTERM; normal leader exit also cleans up remaining group members. Windows uses the trusted System32 `taskkill.exe` with tree termination and escalation. These are local ownership guarantees, not durable process reattachment: SIGKILL, host crashes, or descendants that deliberately escape the process group can outlive the host. Recovery marks old running snapshots `lost_process` and never replays them.
+
+`readOperationOutput` reads only bounded suffixes from the operation's canonical log files: at most 256 KiB scanned per stream and 32 KiB aggregate returned text. Default: 200 lines; maximum: 1,000. `contains` is a literal substring, not a regex or full-history search. UTF-8 boundaries, missing versus empty files, and symlink/traversal rejection are handled explicitly.
+
+`packages/async-pi-extension` registers `run_async`, `operation_status`, `operation_output`, and `operation_cancel`. Each session owns `.pi/async/<session-id>/operations.sqlite` and its own runs directory. Shutdown/reload closes the manager, runner, and store; reopening the same session recovers persisted state. Tools reject operations belonging to another session.
+
+`run_async` calls the existing callable, built-in Bash tool through the nested pipeline, replacing only that call's execution with durable submission. Permission handlers see the actual prefixed command. Normal Bash remains synchronous. Custom, sandboxed, and SDK-supplied Bash backends are rejected rather than bypassed; SDK overrides now report SDK provenance instead of incorrectly reporting built-in provenance. Shell selection and Pi-managed binary PATH are preserved without persisting ambient environment secrets.
+
+Acknowledgements/status remain compact even for large commands. Prompt guidance recommends independent long-running work and bounded inspection. It does not promise automatic completion messages: the completion bridge, service readiness, `/ops` commands, and benchmarks are later milestones.
+
+Verification used temporary real-process scripts and the existing faux-provider `AgentSession` harness. Shell lifecycle/log/recovery and the four permission-gated Pi tools passed, with observed submission latency of 6–7 ms. `npm run check` passed. Scripts/fixtures were removed; no unit tests or build were added/run. Windows cleanup remains unexercised on this macOS workstation. See [experiment verification](../experiments/async-harness/README.md#step-3-milestones-23-shell-runtime-and-pi-tools) for the exercised paths and limitations.

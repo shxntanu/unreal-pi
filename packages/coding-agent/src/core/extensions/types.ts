@@ -370,6 +370,18 @@ export interface ExecuteToolOptions {
 	signal?: AbortSignal;
 	/** Receives partial results of the nested tool, in addition to `tool_execution_update` events. */
 	onUpdate?: AgentToolUpdateCallback;
+	/**
+	 * Trusted replacement for this call's implementation, after the existing tool's argument
+	 * validation and permission hooks. Does not change the registered tool or bypass its hooks.
+	 * Callers must not use this to replace security behavior implemented inside a tool (such as
+	 * a sandboxed Bash override).
+	 */
+	execute?: (
+		toolCallId: string,
+		args: unknown,
+		signal?: AbortSignal,
+		onUpdate?: AgentToolUpdateCallback,
+	) => Promise<AgentToolResult<unknown>>;
 }
 
 /**

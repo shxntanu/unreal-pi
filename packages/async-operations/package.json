@@ -1,0 +1,22 @@
+{
+	"name": "@earendil-works/pi-async-operations",
+	"version": "1.0.0",
+	"description": "Local persistent operation lifecycle runtime for the Pi async harness experiment",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"files": ["dist", "README.md"],
+	"scripts": {
+		"clean": "shx rm -rf dist",
+		"build": "tsc -p tsconfig.build.json",
+		"prepublishOnly": "npm run clean && npm run build"
+	},
+	"license": "MIT",
+	"engines": { "node": ">=22.19.0" }
+}

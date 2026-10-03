@@ -2,7 +2,7 @@
 
 ## Step 1: architecture and baseline metrics
 
-Architecture and extension/core boundaries: [design](../../docs/async-harness-design.md). This step adds no async behavior and no unit tests. Milestone 1 (operation runtime) is next. No benchmark benefit has been measured.
+Architecture and extension/core boundaries: [design](../../docs/async-harness-design.md). Milestones 0–3 are implemented: baseline instrumentation, standalone [operation runtime](../../packages/async-operations/README.md), shell runner, and [Pi extension](../../packages/async-pi-extension/README.md). No unit tests were added and no benchmark benefit has been measured.
 
 Load the observation-only extension with stock Pi from the repository root:
 
@@ -63,3 +63,31 @@ The extension does not register tools, inject messages, alter prompts, mutate re
 ## Exercised verification
 
 A temporary smoke script used the existing `test/suite/harness.ts` and faux provider, with real nested Bash commands. It exercised parallel success/non-zero exit, automatic retry, three separate runs, token reconciliation against finalized responses, nested tool IDs, and an aborted response. Instrumented and uninstrumented transcript role/content matched. The script and its temporary telemetry were removed afterward. These smoke numbers are not benchmark results or evidence of async improvement.
+
+## Step 2: Milestone 1 operation runtime
+
+`@earendil-works/pi-async-operations` provides persistent operations, atomic lifecycle events, runner dispatch, cancellation, bounded concurrency, and recovery using Node's built-in SQLite API. Milestones 2–3 add shell execution and Pi tools; automatic completion delivery remains Milestone 4. See the package README for executable runner usage and lifecycle/ownership limits.
+
+Verification used temporary scripts, not permanent unit tests: real filesystem jobs/output, queued and running cancellation, non-zero and thrown failures, restart/resume, dead-owner reclaim, live-owner exclusion, strict JSON/size bounds, unknown schema rejection, rollback when event insertion fails, and 16 cancellation/completion races. Running work was not replayed after recovery, and rejected persistence never emitted a false completion. A near-limit payload/result boundary failed before the snapshot-budget correction and completed afterward.
+
+The baseline changes were committed as `5ab0c88f4` before this milestone at the user's request.
+
+## Step 3: Milestones 2–3 shell runtime and Pi tools
+
+Load the opt-in extension from an unbuilt source checkout:
+
+```sh
+node --import ./packages/coding-agent/src/experimental/source-resolver.ts \
+  ./packages/coding-agent/src/cli.ts \
+  --extension ./packages/async-pi-extension/src/index.ts
+```
+
+The tools are `run_async`, `operation_status`, `operation_output`, and `operation_cancel`. Logs and SQLite snapshots are isolated under `.pi/async/<session-id>/`. Bash permission hooks run before submission; custom/sandboxed/SDK Bash backends are refused rather than bypassed. Normal Bash is unchanged.
+
+Temporary smoke runs exercised real shell execution: separate exact-byte stdout/stderr logs, exit-code failure, timeout, argv/stdin transport, failed spawn, queued/running cancellation, SIGTERM-resistant descendant cleanup, host SIGTERM cleanup, disk bounds, UTF-8-safe bounded tails/filtering, path/symlink rejection, pending recovery, and lost-process no-replay.
+
+The existing suite harness and faux provider exercised all four extension tools through an actual `AgentSession`, including prefixed Bash permission hooks, rejection without persisting a blocked job, unchanged synchronous Bash, cancellation with child death, shutdown/reopen, prompt guidance, and custom/SDK backend refusal. Observed `run_async` execution latency was 6–7 ms for a command that continued running after acknowledgement; this is a smoke observation, not a benchmark.
+
+Gate A (local runtime) and Gate B (four Pi tools) are exercised. Gate C is not implemented: this milestone does not deliver automatic completion messages. Windows process-tree cleanup has not been exercised on this macOS workstation; abrupt SIGKILL can bypass cleanup and leave descendants running.
+
+`npm run check` passed after correcting the tool-result helper's required `details` field. Temporary smoke scripts and their fixtures were removed. No unit tests, full test suite, build, or paid provider calls were added or run for these milestones.

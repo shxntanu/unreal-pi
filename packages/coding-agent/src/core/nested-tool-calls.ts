@@ -105,6 +105,13 @@ export interface NestedToolCallOptions {
 	signal?: AbortSignal;
 	/** Receives partial results of the nested tool, in addition to `tool_execution_update` events. */
 	onUpdate?: AgentToolUpdateCallback;
+	/** Trusted per-call implementation; lookup, validation, and permission hooks still apply. */
+	execute?: (
+		toolCallId: string,
+		args: unknown,
+		signal?: AbortSignal,
+		onUpdate?: AgentToolUpdateCallback,
+	) => Promise<AgentToolResult<unknown>>;
 }
 
 /** `tool_execution_*` events of nested calls. */
@@ -138,6 +145,7 @@ export interface NestedToolCallHost {
 		parentToolCallId: string,
 		signal: AbortSignal | undefined,
 		onUpdate: (partialResult: AgentToolResult<unknown>) => Promise<void>,
+		execute?: NestedToolCallOptions["execute"],
 	): Promise<AgentToolCallOutcome>;
 	emit(event: NestedToolExecutionEvent): Promise<void>;
 }
@@ -217,17 +225,23 @@ export class NestedToolCallRunner {
 		});
 		let outcome: AgentToolCallOutcome;
 		try {
-			outcome = await this.host.runToolCall(toolCall, callerId, options.signal, async (partialResult) => {
-				options.onUpdate?.(partialResult);
-				await this.host.emit({
-					type: "tool_execution_update",
-					toolCallId: toolCall.id,
-					toolName: name,
-					args: toolCall.arguments,
-					partialResult,
-					parentToolCallId: callerId,
-				});
-			});
+			outcome = await this.host.runToolCall(
+				toolCall,
+				callerId,
+				options.signal,
+				async (partialResult) => {
+					options.onUpdate?.(partialResult);
+					await this.host.emit({
+						type: "tool_execution_update",
+						toolCallId: toolCall.id,
+						toolName: name,
+						args: toolCall.arguments,
+						partialResult,
+						parentToolCallId: callerId,
+					});
+				},
+				options.execute,
+			);
 		} finally {
 			this.scopes.delete(toolCall.id);
 			release?.();
