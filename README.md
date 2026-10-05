@@ -12,7 +12,11 @@
 
 # Unreal Pi
 
-Unreal Pi is a fork of Pi with the asynchronous tool calling capabilities of [Unreal Harness](https://github.com/unreallabsai/unreal-agent) by Unreal Labs.
+Unreal Pi is a fork of Pi with asynchronous shell operations inspired by [Unreal Harness](https://github.com/unreallabsai/unreal-agent) by Unreal Labs. The async extension adds `run_async`, `operation_status`, `operation_output`, and `operation_cancel`.
+
+Use `run_async` for independent, long-running shell work. It returns an operation ID immediately, so Pi can keep inspecting or editing while the command runs. When the operation completes, fails, or is cancelled, Pi receives a compact notification automatically; there is no need to poll for completion.
+
+Async execution currently applies to shell commands. Tools such as `read` and `edit` continue to run as ordinary awaited calls. See the [async extension](packages/async-pi-extension/README.md) for setup and details.
 
 Adapt Pi to your workflows, not the other way around. Customize Pi with [extensions](packages/coding-agent/docs/extensions.md), [skills](packages/coding-agent/docs/skills.md), [prompt templates](packages/coding-agent/docs/prompt-templates.md), and [themes](packages/coding-agent/docs/themes.md). Bundle them as [Pi packages](packages/coding-agent/docs/packages.md) and share via npm or git.
 
@@ -22,7 +26,26 @@ Use Pi [interactively](packages/coding-agent/docs/usage.md), automate it in [pri
 
 ## Getting started
 
-Install the command-line interface:
+Build this fork with asynchronous shell operations enabled:
+
+```bash
+git clone https://github.com/shxntanu/unreal-pi.git
+cd unreal-pi
+npm install --ignore-scripts
+npm run hydrate:model-data
+make pi
+```
+
+Then start Pi in the project directory where you want it to work:
+
+```bash
+cd /path/to/project
+pi
+```
+
+The `pi` command must point to this checkout's `packages/coding-agent/dist/pi` binary. `make pi` builds that binary and registers the async extension in your global Pi settings. If `pi` is not on your `PATH`, run the binary by its full path or add a symlink to a directory on your `PATH`.
+
+Alternatively, install the packaged CLI:
 
 ```bash
 curl -fsSL https://pi.dev/install.sh | sh
