@@ -2,7 +2,7 @@
 
 ## Scope and sequence
 
-Implement `pi-async-harness-experiment.md` one milestone at a time. Architecture inspection and Milestones 0–3 are implemented: baseline instrumentation, standalone operation runtime, shell execution, and four Pi tools. Automatic completion delivery remains Milestone 4. Do not add unit tests. Use temporary smoke scenarios; do not require paid model calls. Commit only when requested and never change branches automatically.
+Implement `pi-async-harness-experiment.md` one milestone at a time. Architecture inspection and Milestones 0–4 are implemented: baseline instrumentation, standalone operation runtime, shell execution, four Pi tools, and automatic completion delivery. Operator commands remain Milestone 5. Do not add unit tests. Use temporary smoke scenarios; do not require paid model calls. Commit only when requested and never change branches automatically.
 
 The inspected checkout differs from the plan's assumed layout: Bash is in `packages/coding-agent/src/core/tools/bash.ts`, sessions in `src/core/session-manager.ts`, and package names use `@earendil-works/`. It also already contains `packages/durable` and `packages/telemetry`. Their existing exports are not evidence that detached shell operations are supported by the CLI. Evaluate them before introducing overlapping abstractions in later milestones.
 
@@ -127,6 +127,20 @@ POSIX jobs use detached process groups. Cancellation and timeout terminate the g
 
 `run_async` calls the existing callable, built-in Bash tool through the nested pipeline, replacing only that call's execution with durable submission. Permission handlers see the actual prefixed command. Normal Bash remains synchronous. Custom, sandboxed, and SDK-supplied Bash backends are rejected rather than bypassed; SDK overrides now report SDK provenance instead of incorrectly reporting built-in provenance. Shell selection and Pi-managed binary PATH are preserved without persisting ambient environment secrets.
 
-Acknowledgements/status remain compact even for large commands. Prompt guidance recommends independent long-running work and bounded inspection. It does not promise automatic completion messages: the completion bridge, service readiness, `/ops` commands, and benchmarks are later milestones.
+Acknowledgements/status remain compact even for large commands. Prompt guidance recommends independent long-running work and bounded inspection. The completion bridge described below now delivers terminal results automatically; service readiness, `/ops` commands, and benchmarks remain later work.
 
 Verification used temporary real-process scripts and the existing faux-provider `AgentSession` harness. Shell lifecycle/log/recovery and the four permission-gated Pi tools passed, with observed submission latency of 6–7 ms. `npm run check` passed. Scripts/fixtures were removed; no unit tests or build were added/run. Windows cleanup remains unexercised on this macOS workstation. See [experiment verification](../experiments/async-harness/README.md#step-3-milestones-23-shell-runtime-and-pi-tools) for the exercised paths and limitations.
+
+## Milestone 4 implementation
+
+`CompletionBridge` subscribes to terminal manager events before paginated reconciliation, covering both new events and recovery performed when the manager opens. Formatting concurrency is bounded to four. Notifications use `pi.sendMessage` with `triggerTurn: true` and steering: idle sessions wake, while active sessions consume messages after their current tool batch without breaking tool-call/result order.
+
+`SendMessageOptions.onPersisted` is the narrow core addition. The synchronous callback runs once after successful session append, not when a message is queued or when the earlier extension `message_end` event fires. It supplies the appended entry ID; observer exceptions are reported without disrupting persisted history. It is not a filesystem-sync or model-consumption guarantee.
+
+The custom message itself is the receipt: `async-operation-completion`, with version, session ID, operation ID, and terminal state in `details`. The bridge validates the appended entry before acknowledging it and scans all session branches on startup for session-global deduplication. Unreceipted terminal operations are backfilled without command replay. RAM reservations suppress duplicates while formatting or queued; aborted unconsumed messages remain recoverable on restart. No delivery table or session-file schema change was added.
+
+Summaries are deterministic and capped at 8 KiB, with up to 1 KiB of output per stream. They include command/purpose, timing, exit/signal/failure, byte counts, paths, the last output line, detected error lines, and remaining tail lines as space permits. Inspection uses bounded log suffixes; errors outside those suffixes are not detected. Control sequences are stripped and UTF-8 truncation is safe. Full inspection remains `operation_output`; no summarization model request is made.
+
+The bridge closes before manager cancellation, preventing shutdown-triggered model turns. Formatting/receipt failures surface through UI and leave recovery to the next startup. Existing session storage limits remain: in-memory receipts are not durable, and append acknowledgement does not guarantee fsync or provider consumption.
+
+Temporary real-shell/faux-provider smoke passed idle and active delivery, success/non-zero exit/cancellation, long multibyte output and error prioritization, ordered tool results, one on-disk receipt per operation across reloads, offline terminal and lost-process backfill, no command replay, shutdown suppression, and recovery after aborting an unconsumed queued notification. A separate filesystem-failure smoke proved failed session append does not acknowledge delivery. No unit tests, build, or paid provider calls were run.

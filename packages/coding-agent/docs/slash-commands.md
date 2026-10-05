@@ -11,6 +11,7 @@ Extensions, prompt templates, and skills can add commands. The command menu in P
 | `/settings` | Open settings |
 | `/model [provider/model]` | Select a model |
 | `/thinking [level]` | Set the thinking level |
+| `/effort [level]` | Set the effort level (alias for `/thinking`) |
 | `/scoped-models` | Configure the models used by interactive cycling |
 | `/login [provider]` | Add provider authentication |
 | `/logout` | Remove provider authentication |

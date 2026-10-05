@@ -9,7 +9,16 @@ This extension exposes four tools for submitting and managing persistent shell o
 
 ## Build and load
 
-Build the package from the repository root with `npm --prefix packages/async-pi-extension run build`, then load its package directory in Pi. The package's `pi.extensions` entry points to `dist/index.js`. The extension requires `@earendil-works/pi-async-operations` and the matching Pi coding-agent package.
+From a source checkout, refresh npm workspace links and build Pi plus its dependencies before launching the extension:
+
+```sh
+npm install --ignore-scripts && \
+npm run build:offline && \
+node ./packages/coding-agent/dist/bundle/cli.js \
+  --extension ./packages/async-pi-extension/dist/index.js
+```
+
+`npm install --ignore-scripts` creates the new async-package links in `node_modules`; updating only the lockfile does not. `build:offline` uses local model data; a fresh checkout needs `npm run hydrate:model-data` first. After dependencies are built, the extension alone can be rebuilt with `npm --prefix packages/async-pi-extension run build`. The package's `pi.extensions` entry points to `dist/index.js`.
 
 For an unbuilt source checkout, load the extension through Pi's source resolver:
 
@@ -29,4 +38,14 @@ Operations are stored under `.pi/async/<session-id>` in the session's working di
 
 Only the Pi-managed binary directory is added to the persisted child environment's `PATH` override. Ambient environment variables are inherited by the runner and are not copied into operation records. Output reads are bounded by the async-operations package.
 
-This milestone does not inject automatic completion messages. Use `operation_status` or `operation_output` only when progress or results are needed; avoid repeated polling. Use normal synchronous `bash` when the result is needed before the next reasoning step.
+Use `run_async` for independent work. Completed, failed, and cancelled operations automatically send a compact message to Pi: idle sessions start a turn; active sessions receive steering after the current tool batch. Normal synchronous `bash` remains appropriate when its result is needed before the next reasoning step. Use `operation_status` for progress and `operation_output` for additional output; do not poll for completion.
+
+## Completion delivery
+
+Notifications are deterministic, with no summarization model call. They include command/purpose, terminal state, duration, exit code/signal, failure details, byte counts, log paths, and selected output/error lines. Messages are capped at 8 KiB, with at most 1 KiB of excerpt text per stream. Output inspection scans at most 256 KiB per stream, uses the reader's bounded suffix, and cannot detect errors outside that suffix. Truncation is disclosed.
+
+Each notification stores a versioned `async-operation-completion` custom-message receipt in the Pi session. `onPersisted` confirms the actual appended entry before the bridge acknowledges delivery; queue admission is not acknowledgement. Startup scans receipts across all session branches and backfills unreceipted terminal operations, including `lost_process` failures, without rerunning commands. Duplicate terminal events and reloads do not generate another notification for a receipted operation.
+
+Shutdown stops the bridge before cancelling operations, avoiding shutdown-triggered model turns. Cancellation receipts and messages queued but not consumed before abort/shutdown are recovered when the same session is reopened. Formatting failures surface through UI notification and leave the operation eligible for recovery on restart.
+
+Receipts use the existing session storage contract: in-memory sessions have in-memory receipts; acknowledgement does not imply filesystem synchronization or successful provider consumption. No separate delivery table or session-file format change is required.

@@ -232,6 +232,14 @@ Reconstruct branch-sensitive state from `ctx.sessionManager.getBranch()` during 
 Do not rebuild it from every file entry because abandoned branches represent alternative histories.
 Register an entry or message renderer when custom stored content should appear in the transcript.
 
+### Custom-message delivery receipts
+
+`pi.sendMessage(message, options)` uses the exported `SendMessageOptions` type. With `triggerTurn: true`, idle sessions start a turn; active sessions queue the message as steering or follow-up according to `deliverAs`. `deliverAs: "nextTurn"` waits for a future prompt instead of waking the model. Steering enters after the current tool batch, not during it.
+
+Use `onPersisted` when an integration must distinguish queue admission from session append. This synchronous observer receives the appended `entryId` and runs once after successful append, provided the message remains custom with its original `customType`; inspect the entry through `ctx.sessionManager.getEntry(entryId)` before acknowledging application-specific receipt data. Synchronous observer exceptions are reported without disrupting history. Do not use the earlier `message_end` extension event as an append acknowledgement.
+
+Acknowledgement follows the session manager's storage contract, not fsync or successful model consumption. In-memory sessions acknowledge in memory. Reconstruct branch-sensitive receipts with `getBranch()`; session-global deduplication, such as one notification per external operation, can deliberately scan `getEntries()` across all branches. A queued message discarded before append has no receipt and remains eligible for recovery by the integration.
+
 <a id="custom-ui"></a>
 <a id="mode-behavior"></a>
 <a id="interact-with-the-user"></a>

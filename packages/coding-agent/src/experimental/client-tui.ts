@@ -623,10 +623,10 @@ export class ExperimentalClientTui implements Component {
 
 	#footer(): string {
 		const view = this.#conversationView();
-		if (!view) return "/model · /thinking · /compact · /reload";
+		if (!view) return "/model · /effort · /compact · /reload";
 		const agent = (view.docs["pi.agent"] ?? {}) as AgentState;
 		const model = agent.model === undefined ? "no model" : `${agent.model.provider}/${agent.model.modelId}`;
-		return `${model} · thinking:${agent.thinkingLevel ?? "off"} · ${view.entries.length} entries · /model · /thinking · /compact · /reload`;
+		return `${model} · effort:${agent.thinkingLevel ?? "off"} · ${view.entries.length} entries · /model · /effort · /compact · /reload`;
 	}
 }
 

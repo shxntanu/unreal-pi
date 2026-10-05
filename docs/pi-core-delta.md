@@ -35,3 +35,12 @@ Milestone 0 was committed as `5ab0c88f4` at the user's request before this work.
 No `packages/agent`, provider API, session file format, or TUI implementation changes. Automatic completion messages are not implemented in this milestone. No unit tests were added.
 
 Verification: temporary real shell and faux-provider session smoke runs passed; `npm run check` passed. Submission returned in 6–7 ms, blocked jobs were not persisted, and cancellation/shutdown removed owned children. Temporary scripts/fixtures were removed. Windows cleanup was not exercised; abrupt forced host termination remains an orphan-process risk.
+
+## Step 4 — Milestone 4
+
+- Added the completion bridge and bounded deterministic summaries to the async extension, with automatic idle wakeup, active steering, persisted receipt validation, session-wide deduplication, and terminal-operation backfill on restart.
+- Added and exported `SendMessageOptions.onPersisted` throughout the custom-message API. `AgentSession` associates the synchronous observer with the original custom message and calls it once after successful session append, never on queue admission. Observer exceptions are reported without disrupting history.
+- Reused the existing `custom_message` format for notification receipts; no operation-store schema, session-file schema, agent-loop scheduling, provider API, runtime dependency, or TUI changes.
+- Closed the bridge before manager shutdown to suppress model wakeups from cleanup cancellation.
+
+Verification used temporary real shell and faux-provider sessions: automatic idle/active consumption, bounded multibyte/error summaries, ordered tool results, on-disk receipt uniqueness across reloads, offline terminal/lost-process recovery without replay, shutdown suppression, and recovery after aborting a queued notification. Failed session append did not acknowledge delivery. No unit tests, build, or paid provider calls were run.

@@ -95,6 +95,7 @@ import {
 	type MessageStartEvent,
 	type MessageUpdateEvent,
 	type ReplacedSessionContext,
+	type SendMessageOptions,
 	type SessionBeforeCompactResult,
 	type SessionBeforeTreeResult,
 	type SessionBoundaryDraft,
@@ -382,6 +383,10 @@ export class AgentSession {
 	private _pendingNextTurnMessages: CustomMessage[] = [];
 	/** Context-only custom messages queued during a run, flushed once the current turn's tool results are in. */
 	private _pendingCustomMessages: CustomMessage[] = [];
+	private _customMessagePersistedCallbacks = new WeakMap<
+		AgentMessage,
+		{ customType: string; callback: (entryId: string) => void }
+	>();
 
 	// Compaction state
 	private _compactionAbortController: AbortController | undefined = undefined;
@@ -1135,6 +1140,7 @@ export class AgentSession {
 				// Regular LLM message - persist as SessionMessageEntry
 				entryId = this.sessionManager.appendMessage(event.message);
 			}
+			if (entryId) this._notifyCustomMessagePersisted(event.message, entryId);
 			if (entryId) this._entryIdsByMessage.set(event.message, entryId);
 			// Other message types (bashExecution, compactionSummary, branchSummary) are persisted elsewhere
 
@@ -2248,7 +2254,7 @@ export class AgentSession {
 	 */
 	async sendCustomMessage<T = unknown>(
 		message: Pick<CustomMessage<T>, "customType" | "content" | "display" | "details">,
-		options?: { triggerTurn?: boolean; deliverAs?: "steer" | "followUp" | "nextTurn" },
+		options?: SendMessageOptions,
 	): Promise<void> {
 		const appMessage = {
 			role: "custom" as const,
@@ -2259,6 +2265,12 @@ export class AgentSession {
 			details: message.details,
 			timestamp: Date.now(),
 		} satisfies CustomMessage<T>;
+		if (options?.onPersisted) {
+			this._customMessagePersistedCallbacks.set(appMessage, {
+				customType: appMessage.customType,
+				callback: options.onPersisted,
+			});
+		}
 		if (options?.deliverAs === "nextTurn") {
 			this._pendingNextTurnMessages.push(appMessage);
 		} else if (this.isStreaming && options?.triggerTurn !== false) {
@@ -2284,13 +2296,38 @@ export class AgentSession {
 		}
 	}
 
+	private _notifyCustomMessagePersisted(message: AgentMessage, entryId: string): void {
+		const acknowledgement = this._customMessagePersistedCallbacks.get(message);
+		if (!acknowledgement) return;
+
+		this._customMessagePersistedCallbacks.delete(message);
+		if (message.role !== "custom" || message.customType !== acknowledgement.customType) return;
+
+		try {
+			const callback = acknowledgement.callback;
+			callback(entryId);
+		} catch (error) {
+			try {
+				this._extensionRunner.emitError({
+					extensionPath: "<runtime>",
+					event: "send_message",
+					error: error instanceof Error ? error.message : String(error),
+					stack: error instanceof Error ? error.stack : undefined,
+				});
+			} catch {
+				// Extension error listeners must not interrupt persisted message handling.
+			}
+		}
+	}
+
 	private _appendCustomMessage(appMessage: CustomMessage): void {
-		this.sessionManager.appendCustomMessageEntry(
+		const entryId = this.sessionManager.appendCustomMessageEntry(
 			appMessage.customType,
 			appMessage.content,
 			appMessage.display,
 			appMessage.details,
 		);
+		this._notifyCustomMessagePersisted(appMessage, entryId);
 		this._refreshFinalizedContext();
 		this._emit({ type: "message_start", message: appMessage });
 		this._emit({ type: "message_end", message: appMessage });

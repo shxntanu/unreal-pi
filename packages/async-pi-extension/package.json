@@ -21,9 +21,11 @@
 		"prepublishOnly": "npm run clean && npm run build"
 	},
 	"dependencies": {
-		"@earendil-works/pi-async-operations": "1.0.0",
-		"@earendil-works/pi-coding-agent": "1.0.0",
-		"typebox": "1.3.27"
+		"@earendil-works/pi-async-operations": "1.0.0"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": "*",
+		"typebox": "*"
 	},
 	"license": "MIT",
 	"engines": { "node": ">=22.19.0" }

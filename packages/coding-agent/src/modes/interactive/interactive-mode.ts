@@ -745,19 +745,21 @@ export class InteractiveMode {
 			};
 		}
 
-		const thinkingCommand = slashCommands.find((command) => command.name === "thinking");
-		if (thinkingCommand) {
-			thinkingCommand.getArgumentCompletions = (prefix: string): AutocompleteItem[] | null => {
-				return createFuzzyAutocompleteItems(
-					this.session.getAvailableThinkingLevels(),
-					prefix,
-					(level) => level,
-					(level) => ({
-						value: level,
-						label: level,
-					}),
-				);
-			};
+		for (const commandName of ["thinking", "effort"]) {
+			const thinkingCommand = slashCommands.find((command) => command.name === commandName);
+			if (thinkingCommand) {
+				thinkingCommand.getArgumentCompletions = (prefix: string): AutocompleteItem[] | null => {
+					return createFuzzyAutocompleteItems(
+						this.session.getAvailableThinkingLevels(),
+						prefix,
+						(level) => level,
+						(level) => ({
+							value: level,
+							label: level,
+						}),
+					);
+				};
+			}
 		}
 
 		const loginCommand = slashCommands.find((command) => command.name === "login");
@@ -3172,7 +3174,13 @@ export class InteractiveMode {
 			if (text === "/thinking" || text.startsWith("/thinking ")) {
 				const searchTerm = text.startsWith("/thinking ") ? text.slice(10).trim() : undefined;
 				this.editor.setText("");
-				this.handleThinkingCommand(searchTerm);
+				this.handleThinkingCommand(searchTerm, "thinking");
+				return;
+			}
+			if (text === "/effort" || text.startsWith("/effort ")) {
+				const searchTerm = text.startsWith("/effort ") ? text.slice(8).trim() : undefined;
+				this.editor.setText("");
+				this.handleThinkingCommand(searchTerm, "effort");
 				return;
 			}
 			if (text === "/export" || text.startsWith("/export ")) {
@@ -5074,38 +5082,43 @@ export class InteractiveMode {
 		});
 	}
 
-	private handleThinkingCommand(searchTerm?: string): void {
+	private handleThinkingCommand(searchTerm?: string, label: "thinking" | "effort" = "thinking"): void {
 		const availableLevels = this.session.getAvailableThinkingLevels();
 		if (!searchTerm) {
-			this.showThinkingSelector();
+			this.showThinkingSelector(label);
 			return;
 		}
 
 		const normalized = searchTerm.trim().toLowerCase();
 		const level = availableLevels.find((candidate) => candidate.toLowerCase() === normalized);
 		if (!level) {
-			this.showError(`Unknown thinking level "${searchTerm}". Available levels: ${availableLevels.join(", ")}.`);
+			this.showError(`Unknown ${label} level "${searchTerm}". Available levels: ${availableLevels.join(", ")}.`);
 			return;
 		}
 
-		this.selectThinkingLevel(level, false);
+		this.selectThinkingLevel(level, false, label);
 	}
 
-	private selectThinkingLevel(level: ThinkingLevel, persist: boolean): void {
+	private selectThinkingLevel(
+		level: ThinkingLevel,
+		persist: boolean,
+		label: "thinking" | "effort" = "thinking",
+	): void {
 		try {
 			this.session.setThinkingLevel(level, { persist });
 			this.footer.invalidate();
 			this.updateEditorBorderColor();
-			this.showStatus(persist ? `Default thinking level: ${level}` : `Thinking level: ${level}`);
+			const statusLabel = label === "effort" ? "effort" : "thinking";
+			this.showStatus(persist ? `Default ${statusLabel} level: ${level}` : `${statusLabel} level: ${level}`);
 		} catch (error) {
 			this.showError(error instanceof Error ? error.message : String(error));
 		}
 	}
 
-	private showThinkingSelector(): void {
+	private showThinkingSelector(label: "thinking" | "effort" = "thinking"): void {
 		this.showSelector((done) => {
 			const selectLevel = (level: ThinkingLevel, persist: boolean) => {
-				this.selectThinkingLevel(level, persist);
+				this.selectThinkingLevel(level, persist, label);
 				done();
 			};
 			const selector = new ThinkingSelectorComponent(
@@ -5118,6 +5131,7 @@ export class InteractiveMode {
 				},
 				(level) => selectLevel(level, true),
 				this.settingsManager.getDefaultThinkingLevel() ?? DEFAULT_THINKING_LEVEL,
+				label === "effort" ? "Effort Level" : "Thinking Level",
 			);
 			return { component: selector, focus: selector };
 		});

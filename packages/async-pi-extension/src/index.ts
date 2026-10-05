@@ -21,6 +21,8 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { type Static, Type } from "typebox";
 
+import { CompletionBridge } from "./completion-bridge.ts";
+
 const OPERATION_KIND = "shell";
 const MAX_OPERATION_ID_LENGTH = 36;
 const MAX_PAYLOAD_BYTES = 256 * 1024;
@@ -76,6 +78,7 @@ type SessionRuntime = {
 	store: SQLiteOperationStore;
 	manager: LocalOperationManager;
 	shell: ShellOperationRunner;
+	bridge: CompletionBridge;
 };
 
 function textResult(text: string): AgentToolResult<unknown> {
@@ -102,6 +105,11 @@ function uuidSessionId(context: ExtensionContext): string {
 async function closeResources(runtime: SessionRuntime): Promise<void> {
 	const errors: Error[] = [];
 	try {
+		await runtime.bridge.close();
+	} catch (error) {
+		errors.push(asError(error));
+	}
+	try {
 		await runtime.manager.close();
 	} catch (error) {
 		errors.push(asError(error));
@@ -120,22 +128,40 @@ async function closeResources(runtime: SessionRuntime): Promise<void> {
 	if (errors.length > 1) throw new AggregateError(errors, "Failed to close the async operation session runtime");
 }
 
-async function createRuntime(context: ExtensionContext): Promise<SessionRuntime> {
+async function createRuntime(context: ExtensionContext, pi: ExtensionAPI): Promise<SessionRuntime> {
 	const sessionId = uuidSessionId(context);
 	const rootDir = resolve(context.cwd, ".pi", "async", sessionId);
 	const store = new SQLiteOperationStore(join(rootDir, "operations.sqlite"));
 	let shell: ShellOperationRunner | undefined;
+	let manager: LocalOperationManager | undefined;
+	let bridge: CompletionBridge | undefined;
 	try {
 		shell = new ShellOperationRunner({ rootDir });
-		const manager = await LocalOperationManager.open({
+		manager = await LocalOperationManager.open({
 			store,
 			runners: { [OPERATION_KIND]: shell },
 			maxConcurrentJobs: 4,
 			onError: (error) => context.ui.notify(`Async operation runtime error: ${error.message}`, "error"),
 		});
-		return { sessionId, rootDir, store, manager, shell };
+		bridge = new CompletionBridge({ pi, context, manager, rootDir, sessionId });
+		bridge.start();
+		return { sessionId, rootDir, store, manager, shell, bridge };
 	} catch (error) {
 		const failures = [asError(error)];
+		if (bridge) {
+			try {
+				await bridge.close();
+			} catch (closeError) {
+				failures.push(asError(closeError));
+			}
+		}
+		if (manager) {
+			try {
+				await manager.close();
+			} catch (closeError) {
+				failures.push(asError(closeError));
+			}
+		}
 		if (shell) {
 			try {
 				await shell.close();
@@ -195,7 +221,7 @@ export function createAsyncPiExtension(pi: ExtensionAPI): void {
 			if (opened.sessionId === sessionId) return opened;
 		}
 		if (activeRuntime) await closeSessionRuntime();
-		const pending = createRuntime(context);
+		const pending = createRuntime(context, pi);
 		openingRuntime = pending;
 		try {
 			const opened = await pending;
@@ -230,7 +256,7 @@ export function createAsyncPiExtension(pi: ExtensionAPI): void {
 			"Run a long-running shell command asynchronously and inspect its status or bounded output when needed.",
 		promptGuidelines: [
 			"Use run_async for shell work expected to take several seconds or longer that can proceed while you inspect or change other files; use normal bash when you need its result before reasoning further.",
-			"Do not repeatedly poll a running operation. Check operation_status or operation_output only when progress or results are needed; this milestone does not send automatic completion messages.",
+			"Do not repeatedly poll a running operation. Terminal results automatically trigger a compact session notification; check operation_status or operation_output only when progress or full output is needed.",
 		],
 		parameters: runAsyncSchema,
 		async execute(_toolCallId, params: RunAsyncParams, signal, _onUpdate, context) {
@@ -311,6 +337,7 @@ export function createAsyncPiExtension(pi: ExtensionAPI): void {
 					...(params.purpose ? [`Purpose: ${compactText(params.purpose, 512)}`] : []),
 					"Command:",
 					compactText((submitted.payload as ShellOperationPayload).command, 2048),
+					"An automatic terminal notification will be sent when this operation finishes.",
 				].join("\n"),
 			);
 		},

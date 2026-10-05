@@ -11,6 +11,8 @@
 - Added an opt-in `baseline-metrics.ts` extension example recording versioned JSONL run and tool metrics for the async harness experiment, including retries, nested tools, and aborted runs without changing model context.
 - Added trusted per-call nested tool executors that retain argument validation and permission/result hooks, enabling the async harness extension to submit authorized Bash jobs without replacing normal Bash.
 - Exported the existing `getBinDir` helper for extensions that preserve Pi-managed binary PATH handling.
+- Added `SendMessageOptions.onPersisted` for custom-message delivery acknowledgement after successful session append, distinct from queue admission.
+- Added `/effort` as an alias for selecting the current model's thinking level.
 
 ### Changed
 

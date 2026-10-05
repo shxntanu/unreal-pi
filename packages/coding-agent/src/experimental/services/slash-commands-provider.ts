@@ -97,7 +97,8 @@ export function createBuiltInSlashCommandsFacet(options: {
 			const sessionPlugins = env.use(SessionPlugins);
 			env.onActivate(() => {
 				env.own(commands.replace(modelCommand(models, ui)));
-				env.own(commands.replace(thinkingCommand(models, ui)));
+				env.own(commands.replace(thinkingCommand(models, ui, "thinking")));
+				env.own(commands.replace(thinkingCommand(models, ui, "effort")));
 				env.own(commands.replace(compactCommand(controller, ui)));
 				env.own(
 					commands.replace({
@@ -168,20 +169,26 @@ function modelCommand(models: ModelsService, ui: PresentationUI): SlashCommandCo
 	};
 }
 
-function thinkingCommand(models: ModelsService, ui: PresentationUI): SlashCommandContribution {
+function thinkingCommand(
+	models: ModelsService,
+	ui: PresentationUI,
+	name: "thinking" | "effort",
+): SlashCommandContribution {
+	const label = name === "effort" ? "effort" : "thinking";
+	const statusLabel = name === "effort" ? "Effort" : "Thinking";
 	return {
-		name: "thinking",
-		description: "Set thinking level",
+		name,
+		description: `Set ${label} level`,
 		argumentHint: "<level>",
 		async run(args, context) {
 			const levels = await models.getThinkingLevels(context);
 			let selected = levels.find((level) => level === args.toLowerCase());
 			if (args.length > 0 && selected === undefined) {
-				throw new Error(`Unknown thinking level "${args}". Available levels: ${levels.join(", ")}.`);
+				throw new Error(`Unknown ${label} level "${args}". Available levels: ${levels.join(", ")}.`);
 			}
 			if (selected === undefined) {
 				const value = await ui.select(
-					"Select thinking level:",
+					`Select ${label} level:`,
 					levels.map((level) => ({
 						value: level,
 						label: models.state.value?.configuration.thinkingLevel === level ? `${level} (selected)` : level,
@@ -192,10 +199,10 @@ function thinkingCommand(models: ModelsService, ui: PresentationUI): SlashComman
 				);
 				if (value === undefined) return undefined;
 				selected = levels.find((level) => level === value);
-				if (selected === undefined) throw new Error(`Unknown thinking level: ${value}`);
+				if (selected === undefined) throw new Error(`Unknown ${label} level: ${value}`);
 			}
 			await models.selectThinking(selected, context);
-			ui.showStatus(`Thinking level: ${selected}.`, context);
+			ui.showStatus(`${statusLabel} level: ${selected}.`, context);
 			return undefined;
 		},
 	};
