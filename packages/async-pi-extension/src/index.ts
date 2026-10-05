@@ -19,9 +19,10 @@ import {
 	getShellConfig,
 	type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { type Static, Type } from "typebox";
 
-import { CompletionBridge } from "./completion-bridge.ts";
+import { COMPLETION_CUSTOM_TYPE, CompletionBridge } from "./completion-bridge.ts";
 
 const OPERATION_KIND = "shell";
 const MAX_OPERATION_ID_LENGTH = 36;
@@ -180,6 +181,14 @@ async function createRuntime(context: ExtensionContext, pi: ExtensionAPI): Promi
 }
 
 export function createAsyncPiExtension(pi: ExtensionAPI): void {
+	pi.registerMessageRenderer<{ displayContent?: string }>(COMPLETION_CUSTOM_TYPE, (message, { expanded }, theme) => {
+		const content = expanded ? (message.details?.displayContent ?? message.content) : message.content;
+		const text =
+			typeof content === "string"
+				? content
+				: content.map((block) => (block.type === "text" ? block.text : "")).join("\n");
+		return new Text(theme.fg("toolOutput", text), 0, 0);
+	});
 	let activeRuntime: SessionRuntime | undefined;
 	let openingRuntime: Promise<SessionRuntime> | undefined;
 

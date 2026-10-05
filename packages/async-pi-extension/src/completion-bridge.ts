@@ -157,7 +157,7 @@ export class CompletionBridge {
 		}
 		validateShellOperationPayload(operation.payload);
 		const payload = operation.payload as ShellOperationPayload;
-		const content = await formatCompletionSummary(this.rootDir, operation, payload);
+		const { content, displayContent } = await formatCompletionSummary(this.rootDir, operation, payload);
 		if (this.closed) return;
 
 		const receipt: CompletionReceipt = {
@@ -176,7 +176,7 @@ export class CompletionBridge {
 				customType: COMPLETION_CUSTOM_TYPE,
 				content,
 				display: true,
-				details: receipt,
+				details: { ...receipt, displayContent },
 			},
 			options,
 		);

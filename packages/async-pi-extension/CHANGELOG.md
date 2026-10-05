@@ -6,6 +6,10 @@
 
 - Added automatic compact terminal notifications, idle wakeup and active steering, persisted session-message receipts, and restart recovery without duplicate notifications or command replay.
 
+### Changed
+
+- Separated compact model-facing completion content from persisted, expandable human-facing output. Successful operations use 512-byte stream excerpts; failures and cancellations use 8 KiB stream excerpts with diagnostic context. Reload and compaction retain the separation.
+
 ### Fixed
 
 - Made `run_async` the explicit default for slow shell commands, including when no independent work remains, and clarified system-prompt guidance to continue independent work or end the turn until automatic completion delivery instead of polling status, output, or logs.

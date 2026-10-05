@@ -5,8 +5,8 @@ import {
 	type ShellOperationPayload,
 } from "@earendil-works/pi-async-operations";
 
-const MAX_SUMMARY_BYTES = 8 * 1024;
-const MAX_STREAM_BYTES = 1024;
+const SUCCESS_STREAM_BYTES = 512;
+const FAILURE_STREAM_BYTES = 8 * 1024; // 8 kb
 const MAX_COMMAND_BYTES = 512;
 const MAX_PURPOSE_BYTES = 256;
 const MAX_ERROR_BYTES = 512;
@@ -16,7 +16,7 @@ export async function formatCompletionSummary(
 	rootDir: string,
 	operation: Operation,
 	payload: ShellOperationPayload,
-): Promise<string> {
+): Promise<{ content: string; displayContent: string }> {
 	const excerpts = await readOperationOutput(rootDir, operation.id, { stream: "both", tailLines: 200 });
 	const stdout = excerpts.find((excerpt) => excerpt.stream === "stdout");
 	const stderr = excerpts.find((excerpt) => excerpt.stream === "stderr");
@@ -39,8 +39,10 @@ export async function formatCompletionSummary(
 	const stderrBytes = outputByteCount(stderr, metadata, "stderrBytes");
 	const stdoutPath = operation.result?.stdoutPath ?? stdout.path;
 	const stderrPath = operation.result?.stderrPath ?? stderr.path;
-	const stdoutExcerpt = selectExcerpt(stdout);
-	const stderrExcerpt = selectExcerpt(stderr);
+	const diagnostic = operation.state !== "completed";
+	const streamBudget = diagnostic ? FAILURE_STREAM_BYTES : SUCCESS_STREAM_BYTES;
+	const stdoutExcerpt = selectExcerpt(stdout, streamBudget, diagnostic);
+	const stderrExcerpt = selectExcerpt(stderr, streamBudget, diagnostic);
 	const excerptsBounded = stdout.truncated || stderr.truncated || stdoutExcerpt.truncated || stderrExcerpt.truncated;
 
 	const lines = [
@@ -57,13 +59,30 @@ export async function formatCompletionSummary(
 		`stdout: ${stdoutBytes} bytes; ${sanitizeText(stdoutPath)}`,
 		`stderr: ${stderrBytes} bytes; ${sanitizeText(stderrPath)}`,
 		"stdout excerpt:",
-		stdoutExcerpt.text || (stdout.missing ? "(output unavailable)" : "(no output)"),
+		sanitizeText(stdout.text) || (stdout.missing ? "(output unavailable)" : "(no output)"),
 		"stderr excerpt:",
-		stderrExcerpt.text || (stderr.missing ? "(output unavailable)" : "(no output)"),
+		sanitizeText(stderr.text) || (stderr.missing ? "(output unavailable)" : "(no output)"),
 		"Only bounded output excerpts are included; use operation_output to inspect more output.",
 		...(excerptsBounded ? ["The scanned output or summary excerpt was truncated to fit its bounds."] : []),
 	];
-	return compactText(lines.join("\n"), MAX_SUMMARY_BYTES);
+	const compactLines = [
+		`Operation ${operation.id}: ${operation.state}${exitCode === undefined ? "" : `, exit ${exitCode}`} — ${compactText(sanitizeText(payload.command), MAX_COMMAND_BYTES)}`,
+		...(payload.purpose ? [`Purpose: ${compactText(sanitizeText(payload.purpose), MAX_PURPOSE_BYTES)}`] : []),
+		...(signal ? [`Signal: ${signal}`] : []),
+		...(failureKind ? [`Failure: ${failureKind}`] : []),
+		...(error ? [`Error: ${compactText(sanitizeText(error), MAX_ERROR_BYTES)}`] : []),
+	];
+	for (const [excerpt, selected] of [
+		[stdout, stdoutExcerpt],
+		[stderr, stderrExcerpt],
+	] as const) {
+		if (excerpt.missing) compactLines.push(`${excerpt.stream}: output unavailable`);
+		else if (selected.text) compactLines.push(`${excerpt.stream}:\n${selected.text}`);
+	}
+	if (excerptsBounded || stdout.missing || stderr.missing) {
+		compactLines.push("Output excerpted or unavailable; more available through operation_output.");
+	}
+	return { content: compactLines.join("\n"), displayContent: lines.join("\n") };
 }
 
 function numericField(record: Record<string, unknown> | undefined, key: string): number | undefined {
@@ -91,19 +110,29 @@ function formatDuration(milliseconds: number): string {
 	return `${(milliseconds / 1000).toFixed(1)}s`;
 }
 
-function selectExcerpt(excerpt: OperationOutputExcerpt): { text: string; truncated: boolean } {
+function selectExcerpt(
+	excerpt: OperationOutputExcerpt,
+	maxBytes: number,
+	diagnostic: boolean,
+): { text: string; truncated: boolean } {
 	if (excerpt.missing || !excerpt.text) return { text: "", truncated: false };
-	const lines = sanitizeText(excerpt.text).split("\n");
+	const sanitized = sanitizeText(excerpt.text);
+	if (Buffer.byteLength(sanitized, "utf8") <= maxBytes) return { text: sanitized, truncated: false };
+	const lines = sanitized.split("\n");
 	const lastIndex = lines.findLastIndex((line) => line.length > 0);
 	if (lastIndex < 0) return { text: "", truncated: false };
 	const tailStart = Math.max(0, lastIndex - 7);
-	const priority = [lastIndex];
-	for (let index = lastIndex - 1; index >= 0; index--) {
-		if (ERROR_LINE_PATTERN.test(lines[index]!)) priority.push(index);
+	const priority = new Set<number>();
+	if (diagnostic) {
+		for (let index = lastIndex; index >= 0; index--) {
+			if (!ERROR_LINE_PATTERN.test(lines[index]!)) continue;
+			priority.add(index);
+			// Include neighboring source locations and diagnostic continuation lines.
+			if (index > 0) priority.add(index - 1);
+			if (index < lastIndex) priority.add(index + 1);
+		}
 	}
-	for (let index = lastIndex - 1; index >= tailStart; index--) {
-		if (!ERROR_LINE_PATTERN.test(lines[index]!)) priority.push(index);
-	}
+	for (let index = lastIndex; index >= tailStart; index--) priority.add(index);
 
 	const selected = new Map<number, string>();
 	let usedBytes = 0;
@@ -112,12 +141,12 @@ function selectExcerpt(excerpt: OperationOutputExcerpt): { text: string; truncat
 		const original = lines[index]!;
 		if (!original) continue;
 		const separatorBytes = selected.size === 0 ? 0 : 1;
-		const remaining = MAX_STREAM_BYTES - usedBytes - separatorBytes;
-		if (remaining <= 0) {
+		const remaining = maxBytes - usedBytes - separatorBytes;
+		if (remaining < Buffer.byteLength(" [truncated]", "utf8")) {
 			truncated = true;
 			continue;
 		}
-		const line = compactText(original, Math.min(remaining, 384));
+		const line = compactText(original, remaining);
 		const lineBytes = Buffer.byteLength(line, "utf8");
 		if (lineBytes > remaining) {
 			truncated = true;
