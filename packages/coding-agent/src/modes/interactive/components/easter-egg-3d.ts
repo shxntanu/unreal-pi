@@ -25,7 +25,7 @@ import { formatKeyText } from "./keybinding-hints.ts";
  * Armin grows out of a speck at the center; the dust spreads out from the center.
  *
  * The blocks are ray cast per braille dot. A braille cell holds 2x4 roughly square dots, so one pixel of a
- * half-block bitmap is exactly 2x2 dots, and the header logo (4x2 cells) is 8x8 dots when it lifts off.
+ * half-block bitmap is exactly 2x2 dots, and the header logo (4x4 cells) is 8x16 dots when it lifts off.
  */
 
 type Rgb = readonly [number, number, number];
@@ -132,11 +132,11 @@ function createModel(
 const CORAL: Rgb = [228, 138, 122];
 const BLUE: Rgb = [79, 142, 179];
 const YELLOW: Rgb = [234, 182, 93];
-const PI_LOGO_PIXELS = ["ccc.", "b.c.", "bb.y", "b..y"];
-const PI_LOGO_COLORS: Record<string, Rgb> = { c: CORAL, b: BLUE, y: YELLOW };
+const PI_LOGO_PIXELS = ["ccc.", "b.c.", "bb.y", "b..y", "....", "b.b.", "bbb.", "...."];
+const PI_LOGO_COLORS: Record<string, Rgb | undefined> = { c: CORAL, b: BLUE, y: YELLOW, ".": undefined };
 
 function piLogoModel(origin: { column: number; row: number }): Model {
-	return createModel(4, 4, (column, row) => PI_LOGO_COLORS[PI_LOGO_PIXELS[row]![column]!], {
+	return createModel(4, 8, (column, row) => PI_LOGO_COLORS[PI_LOGO_PIXELS[row]![column]!], {
 		cameraDistance: 10,
 		widthShare: 0.35,
 		puzzleMoves: (random) => (random < 0.4 ? 2 : 1),

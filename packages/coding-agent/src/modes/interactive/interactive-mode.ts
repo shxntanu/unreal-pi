@@ -251,12 +251,12 @@ class ExpandableText extends ThemedText implements Expandable {
 	}
 }
 
-/** The built-in header. Clicking its logo (the first two lines, after one column of padding) plays an easter egg. */
+/** The built-in header. Clicking its logo (the first four lines, after one column of padding) plays an easter egg. */
 class BuiltInHeader extends ExpandableText {
 	onLogoClick: ((column: number, row: number) => void) | undefined;
 
 	handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
-		if (event.type !== "click" || event.y > 1 || event.x < 1 || event.x > 4 || !this.onLogoClick) return undefined;
+		if (event.type !== "click" || event.y > 3 || event.x < 1 || event.x > 4 || !this.onLogoClick) return undefined;
 		this.onLogoClick(event.screenX - event.x + 1, event.screenY - event.y);
 		return { handled: true };
 	}
@@ -999,13 +999,14 @@ export class InteractiveMode {
 		if (this.shouldShowStartupHeader()) {
 			const showDetails = this.shouldShowStartupDetails();
 			// Built on demand so the header follows theme changes. The logo's first line carries the version,
-			// its second line the first line of key hints. Terminals that cannot render the logo get a
-			// "Pi vX" line instead, with the key hints below it.
+			// with key hints below the full logo. Terminals that cannot render it get a "Pi vX" line instead.
 			const showLogo = supportsPiLogo();
 			const withLogo = (hints: string) => {
 				if (!showLogo) return `${piWordmark()} ${theme.fg("dim", `v${this.version}`)}\n${hints}`;
-				const [top, bottom] = piLogoLines();
-				return `${top} ${theme.fg("dim", `v${this.version}`)}\n${bottom} ${hints}`;
+				const lines = piLogoLines();
+				lines[0] = `${lines[0]} ${theme.fg("dim", `v${this.version}`)}`;
+				lines[lines.length - 1] = `${lines[lines.length - 1]} ${hints}`;
+				return lines.join("\n");
 			};
 
 			// Build startup instructions using keybinding hint helpers

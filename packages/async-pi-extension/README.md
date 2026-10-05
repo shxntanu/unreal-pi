@@ -38,7 +38,14 @@ Operations are stored under `.pi/async/<session-id>` in the session's working di
 
 Only the Pi-managed binary directory is added to the persisted child environment's `PATH` override. Ambient environment variables are inherited by the runner and are not copied into operation records. Output reads are bounded by the async-operations package.
 
-Use `run_async` for independent work. Completed, failed, and cancelled operations automatically send a compact message to Pi: idle sessions start a turn; active sessions receive steering after the current tool batch. Normal synchronous `bash` remains appropriate when its result is needed before the next reasoning step. Use `operation_status` for progress and `operation_output` for additional output; do not poll for completion.
+Use `run_async` by default for shell commands expected to take several seconds or longer, including tests, builds, installs, and network requests. Reserve synchronous `bash` for quick commands such as `ls`, `rg`, and `git status`. A slow command should still use `run_async` when its result is required before the next step: end the turn and resume from its completion notification. The extension contributes the following workflow to Pi's system prompt:
+
+1. Submit the command once and retain its operation ID. The queued acknowledgement is not a completed result.
+2. Continue useful independent work. Do not immediately check whether the command has finished.
+3. If all remaining work depends on the operation, end the turn with a brief pending-work note. Completed, failed, and cancelled operations automatically send a compact message to Pi: idle sessions start a turn; active sessions receive steering after the current tool batch.
+4. Resume dependent work from the notification. Check its result before claiming success; use `operation_output` when the included excerpt lacks necessary details.
+
+For example, start a test command with `run_async`, inspect unrelated files, then end the turn if blocked. The completion notification resumes work on the test result. Do not keep the turn alive with repeated status/output calls, log reads, sleeps, or shell wait loops. Use `operation_status` only for a user-requested progress update or diagnosis of a specific problem, and `operation_cancel` when the work is no longer needed.
 
 ## Completion delivery
 

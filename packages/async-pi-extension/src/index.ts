@@ -251,12 +251,16 @@ export function createAsyncPiExtension(pi: ExtensionAPI): void {
 		name: "run_async",
 		label: "Run Async",
 		description:
-			"Run a shell command as a persistent asynchronous operation and return its operation ID immediately.",
+			"Preferred tool for shell commands expected to take several seconds or longer, such as tests, builds, installs, and network requests. Return an operation ID immediately and deliver the result automatically.",
 		promptSnippet:
-			"Run a long-running shell command asynchronously and inspect its status or bounded output when needed.",
+			"Default for slow shell commands (tests, builds, installs, network requests); return an operation ID and receive the result automatically.",
 		promptGuidelines: [
-			"Use run_async for shell work expected to take several seconds or longer that can proceed while you inspect or change other files; use normal bash when you need its result before reasoning further.",
-			"Do not repeatedly poll a running operation. Terminal results automatically trigger a compact session notification; check operation_status or operation_output only when progress or full output is needed.",
+			"Use run_async by default for shell commands expected to take several seconds or longer, including tests, builds, installs, and network requests. Reserve normal bash for quick commands such as ls, rg, and git status. Needing the result before your next step is not a reason to use synchronous bash for a slow command; submit it with run_async and yield until its completion notification.",
+			"After run_async returns, retain the operation ID and continue useful independent work. A queued or running status is an acknowledgement, not a completed result; do not immediately call operation_status or operation_output to check whether it has finished.",
+			"Completed, failed, and cancelled operations automatically deliver a notification with status, exit code, failure details, and bounded output excerpts. Notifications reach an active turn after its current tool batch or start a new turn when Pi is idle; you do not need to keep a turn open to receive them.",
+			"If all remaining work depends on a pending operation, end your current turn with a brief note identifying the operation and what is waiting on it. Resume the dependent work when its notification arrives. Ending a turn while an operation is pending does not mean the task is complete; do not claim success before checking the result.",
+			"Do not wait for asynchronous completion by repeatedly calling operation_status or operation_output, reading log files, or running sleep commands or shell wait loops. Inspect status only for a user-requested progress update or to diagnose a specific problem; inspect output when the completion notification lacks details needed for your next step.",
+			"For example: run_async starts a test command and returns an ID; inspect unrelated files while it runs, then end the turn if blocked. When the completion notification arrives, check its result and continue. Do not follow run_async with a status/output polling loop.",
 		],
 		parameters: runAsyncSchema,
 		async execute(_toolCallId, params: RunAsyncParams, signal, _onUpdate, context) {
@@ -346,7 +350,9 @@ export function createAsyncPiExtension(pi: ExtensionAPI): void {
 	const operationStatus: ToolDefinition<typeof operationStatusSchema> = {
 		name: "operation_status",
 		label: "Operation Status",
-		description: "Get the state and compact execution details for one asynchronous operation.",
+		description:
+			"Inspect an asynchronous operation's state and execution details on demand, not to poll for completion; results arrive automatically.",
+		promptSnippet: "Inspect operation progress or diagnose a specific problem on demand; do not poll for completion.",
 		parameters: operationStatusSchema,
 		async execute(_toolCallId, params, _signal, _onUpdate, context) {
 			const { operation, payload } = await requireCurrentOperation(context, params.operation_id);
@@ -377,7 +383,9 @@ export function createAsyncPiExtension(pi: ExtensionAPI): void {
 	const operationOutput: ToolDefinition<typeof operationOutputSchema> = {
 		name: "operation_output",
 		label: "Operation Output",
-		description: "Read a bounded tail or literal-substring match from an operation's stdout and/or stderr.",
+		description:
+			"Read a bounded tail or literal-substring match from an operation's stdout and/or stderr when more details are needed; do not poll for completion.",
+		promptSnippet: "Read additional bounded stdout/stderr when the automatic completion excerpt is insufficient.",
 		parameters: operationOutputSchema,
 		async execute(_toolCallId, params: OperationOutputParams, _signal, _onUpdate, context) {
 			const { runtime } = await requireCurrentOperation(context, params.operation_id);
@@ -400,6 +408,7 @@ export function createAsyncPiExtension(pi: ExtensionAPI): void {
 		name: "operation_cancel",
 		label: "Cancel Operation",
 		description: "Cancel a pending or running asynchronous operation; terminal operations are left unchanged.",
+		promptSnippet: "Cancel a pending or running operation when its work is no longer needed.",
 		parameters: operationCancelSchema,
 		async execute(_toolCallId, params, _signal, _onUpdate, context) {
 			const { runtime, operation } = await requireCurrentOperation(context, params.operation_id);

@@ -12,7 +12,7 @@
 
 Unreal Pi is a fork of Pi with asynchronous shell operations inspired by [Unreal Harness](https://github.com/unreallabsai/unreal-agent) by Unreal Labs. The async extension adds `run_async`, `operation_status`, `operation_output`, and `operation_cancel`.
 
-Use `run_async` for independent, long-running shell work. It returns an operation ID immediately, so Pi can keep inspecting or editing while the command runs. When the operation completes, fails, or is cancelled, Pi receives a compact notification automatically; there is no need to poll for completion.
+Use `run_async` by default for slow shell commands, including tests, builds, installs, and network requests. It returns an operation ID immediately, so Pi can keep inspecting or editing while the command runs. If the next step depends on the result, Pi ends the turn and resumes when the operation completes, fails, or is cancelled and its compact notification arrives automatically. Reserve synchronous `bash` for quick commands; there is no need to poll for completion.
 
 Async execution currently applies to shell commands. Tools such as `read` and `edit` continue to run as ordinary awaited calls. See the [async extension](packages/async-pi-extension/README.md) for setup and details.
 

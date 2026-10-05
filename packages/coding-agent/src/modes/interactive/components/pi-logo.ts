@@ -7,22 +7,35 @@ const YELLOW = rgbColor(234, 182, 93);
 const RESET = "\x1b[0m";
 
 /**
- * The pi logo: 4 cells wide and 2 lines tall. Each cell shows two square pixels with half blocks:
- *
- *   coral coral coral .
- *   blue  .     coral .
- *   blue  blue  .     yellow
- *   blue  .     .     yellow
- *
- * The brand colors stay fixed across themes; they follow the terminal's color mode.
+ * The Unreal Pi mark: a P with a detached, hollow U beneath it. Each pair of bitmap rows
+ * is rendered as one terminal row using half-block characters.
  */
-export function piLogoLines(): [string, string] {
+export function piLogoLines(): string[] {
+	const pixels = ["ccc.", "b.c.", "bb.y", "b..y", "....", "b.b.", "bbb.", "...."];
+	const colors: Record<string, typeof CORAL | undefined> = { c: CORAL, b: BLUE, y: YELLOW, ".": undefined };
 	const mode = theme.getColorMode();
 	const fg = (color: typeof CORAL) => foregroundAnsi(color, mode);
-	// The fourth cell of the top line is empty, so it is padded to the same width as the bottom line.
-	const top = `${fg(CORAL)}${backgroundAnsi(BLUE, mode)}▀${RESET}${fg(CORAL)}▀█${RESET} `;
-	const bottom = `${fg(BLUE)}█▀${RESET} ${fg(YELLOW)}█${RESET}`;
-	return [top, bottom];
+	const bg = (color: typeof CORAL) => backgroundAnsi(color, mode);
+	const lines: string[] = [];
+
+	for (let row = 0; row < pixels.length; row += 2) {
+		let line = "";
+		for (let column = 0; column < pixels[row]!.length; column++) {
+			const upper = colors[pixels[row]![column]!];
+			const lower = colors[pixels[row + 1]![column]!];
+			if (upper && lower) {
+				line += `${fg(upper)}${bg(lower)}▀${RESET}`;
+			} else if (upper) {
+				line += `${fg(upper)}▀${RESET}`;
+			} else if (lower) {
+				line += `${fg(lower)}▄${RESET}`;
+			} else {
+				line += " ";
+			}
+		}
+		lines.push(line);
+	}
+	return lines;
 }
 
 /**

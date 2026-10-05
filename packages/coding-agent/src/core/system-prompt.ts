@@ -97,6 +97,14 @@ function buildRules(
 	const hasGrep = selectedTools.includes("grep");
 	const hasFind = selectedTools.includes("find");
 	const hasLs = selectedTools.includes("ls");
+	if (selectedTools.includes("run_async")) {
+		addRule(
+			"run_async is available and is the default for shell commands expected to take several seconds" +
+				" or longer, such as tests, builds, installs, and network requests. Use it even when no independent" +
+				" work remains: end the turn and resume from the automatic completion notification. Reserve synchronous" +
+				" bash for quick commands such as ls, rg, and git status; do not background commands with & or poll for completion.",
+		);
+	}
 
 	if ((hasBash || hasPowerShell) && !hasGrep && !hasFind && !hasLs) {
 		if (hasBash && hasPowerShell) {

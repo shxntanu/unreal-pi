@@ -150,6 +150,27 @@ describe("buildSystemPrompt", () => {
 	});
 
 	describe("prompt guidelines", () => {
+		test("makes async command routing explicit whenever run_async is active, even without contributed snippets", () => {
+			const prompt = buildSystemPrompt({
+				selectedTools: ["bash", "run_async"],
+				cwd: process.cwd(),
+			});
+
+			expect(prompt).toContain("run_async is available");
+			expect(prompt).toContain("default for shell commands expected to take several seconds or longer");
+			expect(prompt).toContain("even when no independent work remains");
+		});
+
+		test("does not advertise async command routing when run_async is inactive", () => {
+			const prompt = buildSystemPrompt({
+				selectedTools: ["bash"],
+				toolSnippets: { run_async: "Run asynchronously" },
+				cwd: process.cwd(),
+			});
+
+			expect(prompt).not.toContain("run_async");
+		});
+
 		test("appends promptGuidelines to default guidelines", () => {
 			const prompt = buildSystemPrompt({
 				selectedTools: ["read", "dynamic_tool"],

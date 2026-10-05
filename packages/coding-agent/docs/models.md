@@ -63,6 +63,34 @@ Use [`models.json`](configuration.md#agent-directory) when an endpoint speaks an
 
 The dummy key makes the model available to Pi; Ollama ignores it. For an authenticated endpoint, `apiKey` and header values can use `$NAME` or `${NAME}` environment interpolation, a literal value, or a leading `!command`. Commands in `models.json` run at request time and are not cached by Pi.
 
+### LiteLLM proxy
+
+LiteLLM's OpenAI-compatible Chat Completions endpoint works with the same configuration. Add each LiteLLM model name as a Pi model ID and point `baseUrl` at the proxy's `/v1` endpoint:
+
+```json
+{
+  "providers": {
+    "litellm": {
+      "baseUrl": "http://localhost:4000/v1",
+      "api": "openai-completions",
+      "apiKey": "$LITELLM_API_KEY",
+      "models": [
+        {
+          "id": "claude-sonnet",
+          "name": "Claude Sonnet via LiteLLM",
+          "contextWindow": 200000,
+          "maxTokens": 8192,
+          "input": ["text", "image"],
+          "reasoning": true
+        }
+      ]
+    }
+  }
+}
+```
+
+Replace `claude-sonnet` with the model name configured in LiteLLM, and set `LITELLM_API_KEY` to the proxy key. The `contextWindow`, `maxTokens`, `input`, and `reasoning` values should reflect the upstream model and proxy capabilities; adjust or omit them as appropriate. Then select it with `/model litellm/claude-sonnet`. Pi already supports LiteLLM through its generic OpenAI-compatible provider configuration; no separate provider integration is needed.
+
 Opening `/model` reloads the file. A `models` entry adds or replaces a model with the same ID on that provider. Use `modelOverrides` to change metadata for an existing built-in or extension-provided model without replacing the provider's model list. Unknown override IDs are ignored.
 
 ### Describe model input and caching

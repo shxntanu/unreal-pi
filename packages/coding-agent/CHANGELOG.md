@@ -29,6 +29,7 @@
 - Fixed a `codemode` script that prints in a loop crashing pi by running out of memory: a script fails once its output passes 16 Mi characters or 100000 items ([#10283](https://github.com/earendil-works/pi/issues/10283))
 - Fixed JPEG, GIF, and WebP images rendered by extensions through `Image` not appearing in Kitty, Ghostty, WezTerm, and Warp ([#10292](https://github.com/earendil-works/pi/issues/10292))
 - Fixed SDK base-tool overrides reporting built-in source provenance instead of SDK provenance.
+- Made the default system prompt explicitly advertise active `run_async` tools and prefer asynchronous execution for slow shell commands, including when the next step depends on their result.
 
 ## [1.0.0] - 2026-10-01
 
