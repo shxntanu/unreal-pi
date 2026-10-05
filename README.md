@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://pi.dev">
-    <img alt="pi logo" src="https://pi.dev/logo-auto.svg" width="128">
+    <img alt="pi logo" src="./assets/unreal-pi.png" width="128">
   </a>
 </p>
 <p align="center">
@@ -10,9 +10,9 @@
 
 > New issues and PRs from new contributors are auto-closed by default. Maintainers review auto-closed issues daily. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-# Pi
+# Unreal Pi
 
-Pi is a minimal, extensible agent harness that you can make your own.
+Unreal Pi is a fork of Pi with the asynchronous tool calling capabilities of [Unreal Harness](https://github.com/unreallabsai/unreal-agent) by Unreal Labs.
 
 Adapt Pi to your workflows, not the other way around. Customize Pi with [extensions](packages/coding-agent/docs/extensions.md), [skills](packages/coding-agent/docs/skills.md), [prompt templates](packages/coding-agent/docs/prompt-templates.md), and [themes](packages/coding-agent/docs/themes.md). Bundle them as [Pi packages](packages/coding-agent/docs/packages.md) and share via npm or git.
 
