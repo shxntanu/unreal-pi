@@ -4,6 +4,9 @@
   "packages": [
     "./packages/async-pi-extension",
     "npm:@tmustier/pi-usage-extension",
-    "npm:pi-image-paste"
+    "npm:pi-image-paste",
+    "npm:pi-subagents",
+    "npm:pi-goal-x",
+    "npm:pi-lens"
   ]
 }
