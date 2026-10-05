@@ -8,8 +8,6 @@
   <a href="https://www.npmjs.com/package/@earendil-works/pi-coding-agent"><img alt="npm" src="https://img.shields.io/npm/v/@earendil-works/pi-coding-agent?style=flat-square" /></a>
 </p>
 
-> New issues and PRs from new contributors are auto-closed by default. Maintainers review auto-closed issues daily. See [CONTRIBUTING.md](CONTRIBUTING.md).
-
 # Unreal Pi
 
 Unreal Pi is a fork of Pi with asynchronous shell operations inspired by [Unreal Harness](https://github.com/unreallabsai/unreal-agent) by Unreal Labs. The async extension adds `run_async`, `operation_status`, `operation_output`, and `operation_cancel`.
