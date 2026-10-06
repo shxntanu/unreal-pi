@@ -197,6 +197,44 @@ describe("AgentSession model and extension characterization", () => {
 		expect(harness.session.thinkingLevel).toBe("high");
 	});
 
+	it("lists the reasoning levels supported by the selected model", async () => {
+		const harness = await createHarness({
+			models: [
+				{ id: "oai-model", reasoning: true },
+				{ id: "anthropic-model", reasoning: true },
+			],
+		});
+		harnesses.push(harness);
+		harness.getModel("oai-model")!.thinkingLevelMap = {
+			minimal: "minimal",
+			low: "low",
+			medium: "medium",
+			high: "high",
+			xhigh: "xhigh",
+			max: null,
+		};
+		harness.getModel("anthropic-model")!.thinkingLevelMap = {
+			minimal: null,
+			low: "low",
+			medium: "medium",
+			high: "high",
+			xhigh: null,
+			max: null,
+		};
+
+		expect(harness.session.getAvailableThinkingLevels()).toEqual([
+			"off",
+			"minimal",
+			"low",
+			"medium",
+			"high",
+			"xhigh",
+		]);
+
+		await harness.session.setModel(harness.getModel("anthropic-model")!);
+		expect(harness.session.getAvailableThinkingLevels()).toEqual(["off", "low", "medium", "high"]);
+	});
+
 	it("clamps thinking levels to model capabilities and cycles available levels", async () => {
 		const harness = await createHarness({ models: [{ id: "faux-1", reasoning: false }] });
 		harnesses.push(harness);
