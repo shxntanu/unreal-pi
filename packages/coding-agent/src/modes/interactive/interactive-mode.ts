@@ -3249,6 +3249,11 @@ export class InteractiveMode {
 				this.editor.setText("");
 				return;
 			}
+			if (text === "/async") {
+				this.handleAsyncCommand();
+				this.editor.setText("");
+				return;
+			}
 			if (text === "/changelog") {
 				this.handleChangelogCommand();
 				this.editor.setText("");
@@ -4329,13 +4334,19 @@ export class InteractiveMode {
 		this.isShuttingDown = true;
 		try {
 			this.unregisterSignalHandlers();
-		} catch {}
+		} catch (cleanupError) {
+			console.error("Failed to unregister signal handlers during crash cleanup:", cleanupError);
+		}
 		try {
 			killTrackedDetachedChildren();
-		} catch {}
+		} catch (cleanupError) {
+			console.error("Failed to stop detached children during crash cleanup:", cleanupError);
+		}
 		try {
 			this.ui.stop();
-		} catch {}
+		} catch (cleanupError) {
+			console.error("Failed to stop the terminal UI during crash cleanup:", cleanupError);
+		}
 		console.error(`${APP_NAME} exiting due to uncaughtException:`);
 		console.error(error);
 		const extensionHint = this.getCrashExtensionHint(error);
@@ -6665,6 +6676,32 @@ export class InteractiveMode {
 		this.chatContainer.addChild(new Spacer(1));
 		const displayName = sessionName ?? name;
 		this.chatContainer.addChild(new ThemedText(() => theme.fg("dim", `Session name set: ${displayName}`), 1, 0));
+		this.ui.requestRender();
+	}
+
+	private handleAsyncCommand(): void {
+		const { steering, followUp } = this.getAllQueuedMessages();
+		const queuedCount = steering.length + followUp.length;
+		let info = `${theme.bold("Queued Messages")} (${queuedCount})\n\n`;
+
+		if (queuedCount === 0) {
+			info += theme.fg("dim", "No messages are queued.");
+		} else {
+			for (const [label, status, messages] of [
+				["Steering", "will be sent during the current run", steering],
+				["Follow-up", "will be sent after the current run", followUp],
+			] as const) {
+				if (messages.length === 0) continue;
+				info += `${theme.bold(label)} ${theme.fg("dim", `(${status})`)}\n`;
+				for (const [index, message] of messages.entries()) {
+					info += `${index + 1}. ${message}\n`;
+				}
+				info += "\n";
+			}
+		}
+
+		this.chatContainer.addChild(new Spacer(1));
+		this.chatContainer.addChild(new ThemedText(() => info.trimEnd(), 1, 0));
 		this.ui.requestRender();
 	}
 
