@@ -160,7 +160,7 @@ import {
 	formatAuthSelectorProviderType,
 	OAuthSelectorComponent,
 } from "./components/oauth-selector.ts";
-import { piLogoLines, piWordmark, supportsPiLogo } from "./components/pi-logo.ts";
+import { piLogoLines, supportsPiLogo } from "./components/pi-logo.ts";
 import { createLoginMenuSelector } from "./components/radius-login-selector.ts";
 import { ScopedModelsSelectorComponent } from "./components/scoped-models-selector.ts";
 import { SessionSelectorComponent } from "./components/session-selector.ts";
@@ -1006,9 +1006,9 @@ export class InteractiveMode {
 			// with key hints below the full logo. Terminals that cannot render it get a "Pi vX" line instead.
 			const showLogo = supportsPiLogo();
 			const withLogo = (hints: string) => {
-				if (!showLogo) return `${piWordmark()} ${theme.fg("dim", `v${this.version}`)}\n${hints}`;
+				if (!showLogo) return `Unreal Pi ${theme.fg("dim", `v${this.version}`)}\n${hints}`;
 				const lines = piLogoLines();
-				lines[0] = `${lines[0]} ${theme.fg("dim", `v${this.version}`)}`;
+				lines[0] = `${lines[0]} Unreal Pi ${theme.fg("dim", `v${this.version}`)}`;
 				lines[lines.length - 1] = `${lines[lines.length - 1]} ${hints}`;
 				return lines.join("\n");
 			};
