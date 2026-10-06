@@ -1,6 +1,4 @@
 {
-  "defaultProvider": "openai",
-  "defaultModel": "gpt-6-luna",
   "packages": [
     "./packages/async-pi-extension",
     "npm:@tmustier/pi-usage-extension",
