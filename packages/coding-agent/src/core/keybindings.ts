@@ -140,7 +140,7 @@ export const KEYBINDINGS = {
 		description: "Restore queued messages",
 	},
 	"app.clipboard.pasteImage": {
-		defaultKeys: windowsKeybindings ? "alt+v" : "ctrl+v",
+		defaultKeys: windowsKeybindings ? "alt+v" : process.platform === "darwin" ? ["ctrl+v", "super+v"] : "ctrl+v",
 		description: "Paste files on macOS, images, or text from clipboard",
 	},
 	"app.session.new": { defaultKeys: [], description: "Start a new session" },

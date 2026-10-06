@@ -125,7 +125,9 @@ In fullscreen mode, these actions control the transcript and take precedence ove
 | `app.exit` | `ctrl+d` | Exit (when editor empty) |
 | `app.suspend` | `ctrl+z` (None on Windows) | Suspend to background |
 | `app.editor.external` | `ctrl+g` | Open in external editor (`externalEditor`, `$VISUAL`, `$EDITOR`, Notepad on Windows, or `nano` elsewhere) |
-| `app.clipboard.pasteImage` | `ctrl+v` (`alt+v` on Windows and WSL) | Paste files on macOS, images, or text from clipboard |
+| `app.clipboard.pasteImage` | `ctrl+v` (also `super+v` on macOS; `alt+v` on Windows and WSL) | Paste files on macOS, images, or text from clipboard |
+
+macOS terminals handle Cmd+V themselves and paste only text, so `super+v` reaches Pi only if the terminal forwards it when the clipboard has no text. In Ghostty, add `keybind = performable:super+v=paste_from_clipboard` to the config: Cmd+V still pastes text, and an image-only clipboard is forwarded to Pi.
 
 On native Windows, `app.suspend` has no default because Windows terminals do not support Unix job control. If you assign it manually, Pi shows a status message instead of suspending. WSL uses the normal `ctrl+z` and `fg` behavior.
 

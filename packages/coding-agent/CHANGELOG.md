@@ -13,6 +13,7 @@
 - Exported the existing `getBinDir` helper for extensions that preserve Pi-managed binary PATH handling.
 - Added `SendMessageOptions.onPersisted` for custom-message delivery acknowledgement after successful session append, distinct from queue admission.
 - Added `/effort` as an alias for selecting the current model's thinking level.
+- Added `super+v` (Cmd+V) as a default `app.clipboard.pasteImage` key on macOS, so terminals that forward Cmd+V for an image-only clipboard, such as Ghostty with a `performable:` keybind, paste images ([docs](docs/keybindings.md)).
 
 ### Changed
 
