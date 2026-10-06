@@ -16,6 +16,7 @@ type SubmitContext = {
 	flushPendingBashComponents: () => void;
 	onInputCallback?: (text: string) => void;
 	pendingUserInputs: string[];
+	shutdown: () => Promise<void>;
 };
 
 type InputContext = {
@@ -51,6 +52,7 @@ function createSubmitContext(): SubmitContext {
 		},
 		flushPendingBashComponents: vi.fn(),
 		pendingUserInputs: [],
+		shutdown: vi.fn(async () => {}),
 	};
 }
 
@@ -65,6 +67,17 @@ describe("InteractiveMode startup input", () => {
 
 		expect(context.editor.setText).toHaveBeenCalledWith("early prompt");
 		expect(context.showStatus).toHaveBeenCalledWith("Startup is still in progress");
+	});
+
+	it("exits the chat with /exit", async () => {
+		const context = createSubmitContext();
+		interactiveModePrototype.setupEditorSubmitHandler.call(context);
+
+		context.defaultEditor.onSubmit?.("/exit");
+
+		expect(context.editor.setText).toHaveBeenCalledWith("");
+		expect(context.shutdown).toHaveBeenCalledOnce();
+		expect(context.pendingUserInputs).toEqual([]);
 	});
 
 	it("queues a normal prompt submitted before the input callback is installed", async () => {
